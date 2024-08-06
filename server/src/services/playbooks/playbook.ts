@@ -1,9 +1,8 @@
-import { InternalError, NotFoundError } from '../../core/api/ApiError';
-import { SuccessResponse } from '../../core/api/ApiResponse';
+import { InternalError, NotFoundError } from '../../middlewares/api/ApiError';
+import { SuccessResponse } from '../../middlewares/api/ApiResponse';
 import PlaybookRepo from '../../data/database/repository/PlaybookRepo';
-import asyncHandler from '../../helpers/AsyncHandler';
-import logger from '../../logger';
-import Shell from '../../integrations/shell';
+import asyncHandler from '../../middlewares/AsyncHandler';
+import Shell from '../../modules/shell';
 import PlaybooksRepositoryUseCases from '../../use-cases/PlaybooksRepositoryUseCases';
 import PlaybookUseCases from '../../use-cases/PlaybookUseCases';
 
@@ -18,13 +17,13 @@ export const getPlaybooks = asyncHandler(async (req, res) => {
 
 export const getPlaybook = asyncHandler(async (req, res) => {
   const { uuid } = req.params;
-  logger.info(`[CONTROLLER] - GET - /playbooks/${uuid}`);
+
   const playbook = await PlaybookRepo.findOneByUuid(uuid);
   if (!playbook) {
     throw new NotFoundError(`Playbook ${uuid} not found`);
   }
   try {
-    const content = await Shell.PlaybookFileShell.readPlaybook(playbook.path);
+    const content = Shell.PlaybookFileManager.readPlaybook(playbook.path);
     new SuccessResponse('Get Playbook successful', content).send(res);
   } catch (error: any) {
     throw new InternalError(error.message);
@@ -33,13 +32,13 @@ export const getPlaybook = asyncHandler(async (req, res) => {
 
 export const editPlaybook = asyncHandler(async (req, res) => {
   const { uuid } = req.params;
-  logger.info(`[CONTROLLER][ANSIBLE] - PATCH - /playbooks/${uuid}`);
+
   const playbook = await PlaybookRepo.findOneByUuid(uuid);
   if (!playbook) {
     throw new NotFoundError(`Playbook ${uuid} not found`);
   }
   try {
-    await Shell.PlaybookFileShell.editPlaybook(playbook.path, req.body.content);
+    Shell.PlaybookFileManager.editPlaybook(req.body.content, playbook.path);
     new SuccessResponse('Edit playbook successful').send(res);
   } catch (error: any) {
     throw new InternalError(error.message);
@@ -48,7 +47,7 @@ export const editPlaybook = asyncHandler(async (req, res) => {
 
 export const addExtraVarToPlaybook = asyncHandler(async (req, res) => {
   const { uuid } = req.params;
-  logger.info(`[CONTROLLER] - POST - /${uuid}/extravars`);
+
   const playbook = await PlaybookRepo.findOneByUuid(uuid);
   if (!playbook) {
     throw new NotFoundError(`Playbook ${uuid} not found`);
@@ -63,7 +62,7 @@ export const addExtraVarToPlaybook = asyncHandler(async (req, res) => {
 
 export const deleteExtraVarFromPlaybook = asyncHandler(async (req, res) => {
   const { uuid, varname } = req.params;
-  logger.info(`[CONTROLLER] - DELETE - /${uuid}/extravars/${varname}`);
+
   const playbook = await PlaybookRepo.findOneByUuid(uuid);
   if (!playbook) {
     throw new NotFoundError(`Playbook ${uuid} not found`);
@@ -78,7 +77,7 @@ export const deleteExtraVarFromPlaybook = asyncHandler(async (req, res) => {
 
 export const deletePlaybook = asyncHandler(async (req, res) => {
   const { uuid } = req.params;
-  logger.info(`[CONTROLLER] - DELETE - /playbook/${uuid}`);
+
   const playbook = await PlaybookRepo.findOneByUuid(uuid);
   if (!playbook) {
     throw new NotFoundError(`Playbook ${uuid} not found`);

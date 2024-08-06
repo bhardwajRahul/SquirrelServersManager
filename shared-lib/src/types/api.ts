@@ -1,5 +1,6 @@
 import { SSHType } from '../enums/ansible';
 import { PlaybooksRepositoryType } from '../enums/playbooks';
+import { AutomationChain } from '../form/automation';
 import { ExtendedTreeNode } from './tree';
 
 export type Response<T> = {
@@ -26,8 +27,6 @@ export type CurrentUser = {
   name?: string;
   avatar?: string;
   email?: string;
-  notifyCount?: number;
-  unreadCount?: number;
   access?: string;
   systemPerformance: UserSystemPerformance;
   devices?: {
@@ -375,6 +374,8 @@ export type ServerLog = {
   pid: number;
   level: number;
   msg: string;
+  req: any;
+  res: any;
 };
 
 export type DeviceAuthResponse = {
@@ -544,6 +545,7 @@ export type ExtraVar = {
   value?: string;
   required?: boolean;
   canBeOverride?: boolean;
+  local?: boolean;
 };
 
 export type Image = {
@@ -641,3 +643,23 @@ export type LocalRepository = {
 }
 
 export type ExtraVars = ExtraVar[];
+
+export type Automation = {
+  name: string;
+  uuid: string;
+  automationChains: AutomationChain;
+  lastExecutionStatus: 'failed' | 'success';
+  lastExecutionTime: Date;
+  enabled: boolean;
+}
+
+export type InAppNotification = {
+  message: string;
+  severity: 'info' | 'warning' | 'error';
+  event: string;
+  module: string;
+  moduleId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  seen: boolean;
+}

@@ -1,69 +1,59 @@
-import { Playbooks, SettingsKeys } from 'ssm-shared-lib';
+import { SettingsKeys } from 'ssm-shared-lib';
 import { getFromCache } from '../../data/cache';
 import initRedisValues from '../../data/cache/defaults';
 import { PlaybookModel } from '../../data/database/model/Playbook';
-import PlaybooksRepositoryRepo from '../../data/database/repository/PlaybooksRepositoryRepo';
-import Crons from '../../integrations/crons';
-import WatcherEngine from '../../integrations/docker/core/WatcherEngine';
-import providerConf from '../../integrations/docker/registries/providers/provider.conf';
-import PlaybooksRepositoryEngine from '../../integrations/playbooks-repository/PlaybooksRepositoryEngine';
-import logger from '../../logger';
+import PinoLogger from '../../logger';
+import AutomationEngine from '../../modules/automations/AutomationEngine';
+import Crons from '../../modules/crons';
+import WatcherEngine from '../../modules/docker/core/WatcherEngine';
+import providerConf from '../../modules/docker/registries/providers/provider.conf';
+import NotificationComponent from '../../modules/notifications/NotificationComponent';
+import { createADefaultLocalUserRepository } from '../../modules/playbooks-repository/default-repositories';
+import PlaybooksRepositoryEngine from '../../modules/playbooks-repository/PlaybooksRepositoryEngine';
 import ContainerRegistryUseCases from '../../use-cases/ContainerRegistryUseCases';
 import DeviceAuthUseCases from '../../use-cases/DeviceAuthUseCases';
-import { setAnsibleVersion } from '../system/version';
+import { setAnsibleVersions } from '../system/ansible-versions';
 
-const corePlaybooksRepository = {
-  name: 'ssm-core',
-  uuid: '00000000-0000-0000-0000-000000000000',
-  enabled: true,
-  type: Playbooks.PlaybooksRepositoryType.LOCAL,
-  directory: '/server/src/ansible/00000000-0000-0000-0000-000000000000',
-  default: true,
-};
+class Startup {
+  private logger = PinoLogger.child({ module: 'Startup' }, { msgPrefix: '[STARTUP] - ' });
 
-const toolsPlaybooksRepository = {
-  name: 'ssm-tools',
-  uuid: '00000000-0000-0000-0000-000000000001',
-  enabled: true,
-  type: Playbooks.PlaybooksRepositoryType.LOCAL,
-  directory: '/server/src/ansible/00000000-0000-0000-0000-000000000001',
-  default: true,
-};
+  async init() {
+    const version = await getFromCache(SettingsKeys.GeneralSettingsKeys.SCHEME_VERSION);
+    this.logger.info(`initialization`);
+    this.logger.info(`initialization - Scheme Version: ${version}`);
 
-async function init() {
-  const version = await getFromCache(SettingsKeys.GeneralSettingsKeys.SCHEME_VERSION);
-  logger.info(`[CONFIGURATION] - initialization`);
-  logger.info(`[CONFIGURATION] - initialization - Scheme Version: ${version}`);
+    // Must be called first
+    void DeviceAuthUseCases.saveAllDeviceAuthSshKeys();
+    // Sync to prevent empty UI.
+    await PlaybooksRepositoryEngine.init();
+    // the rest
+    void NotificationComponent.init();
+    void Crons.initScheduledJobs();
+    void WatcherEngine.init();
+    void AutomationEngine.init();
 
-  await PlaybooksRepositoryRepo.updateOrCreate(corePlaybooksRepository);
-  await PlaybooksRepositoryRepo.updateOrCreate(toolsPlaybooksRepository);
-  await PlaybooksRepositoryEngine.init();
-  void DeviceAuthUseCases.saveAllDeviceAuthSshKeys();
-  void Crons.initScheduledJobs();
-  void WatcherEngine.init();
+    if (version !== SettingsKeys.DefaultValue.SCHEME_VERSION) {
+      await this.migrate();
+      await createADefaultLocalUserRepository();
+      this.logger.warn(`Scheme version differed, starting writing updates`);
+      await initRedisValues();
+      void setAnsibleVersions();
+      await PlaybooksRepositoryEngine.syncAllRegistered();
+      providerConf
+        .filter(({ persist }) => persist)
+        .map((e) => {
+          ContainerRegistryUseCases.addIfNotExists(e);
+        });
+    }
+  }
 
-  if (version !== SettingsKeys.DefaultValue.SCHEME_VERSION) {
-    await migrate();
-    logger.warn(`[CONFIGURATION] - Scheme version differed, starting writing updates`);
-    await initRedisValues();
-    void setAnsibleVersion();
-    await PlaybooksRepositoryEngine.syncAllRegistered();
-    providerConf
-      .filter(({ persist }) => persist)
-      .map((e) => {
-        ContainerRegistryUseCases.addIfNotExists(e);
-      });
+  private async migrate() {
+    try {
+      await PlaybookModel.syncIndexes();
+    } catch (error: any) {
+      this.logger.error(error);
+    }
   }
 }
 
-async function migrate() {
-  try {
-    await PlaybookModel.syncIndexes();
-  } catch (error: any) {
-    logger.error(error);
-  }
-}
-
-export default {
-  init,
-};
+export default new Startup();

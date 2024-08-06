@@ -3,7 +3,7 @@ import {
   addLinkProperty,
   getKindProperty,
   isUpdateAvailable,
-} from '../../../integrations/docker/utils/utils';
+} from '../../../modules/docker/utils/utils';
 import Container, { ContainerModel } from '../model/Container';
 import Device from '../model/Device';
 
@@ -62,6 +62,10 @@ async function count() {
   return await ContainerModel.countDocuments().exec();
 }
 
+async function updateStatusByWatcher(watcher: string, status: string) {
+  await ContainerModel.updateMany({ watcher: watcher }, { status: status }).exec();
+}
+
 export default {
   findContainerById,
   findContainersByWatcher,
@@ -72,4 +76,5 @@ export default {
   countByDeviceId,
   countByStatus,
   count,
+  updateStatusByWatcher,
 };

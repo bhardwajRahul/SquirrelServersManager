@@ -1,18 +1,18 @@
-import { SettingsKeys } from 'ssm-shared-lib';
-import { AuthFailureError } from '../../core/api/ApiError';
-import { SuccessResponse } from '../../core/api/ApiResponse';
-import { getAnsibleVersion } from '../../core/system/version';
+import { API, SettingsKeys } from 'ssm-shared-lib';
+import InAppNotificationRepo from '../../data/database/repository/InAppNotificationRepo';
+import { AuthFailureError } from '../../middlewares/api/ApiError';
+import { SuccessResponse } from '../../middlewares/api/ApiResponse';
+import { getAnsibleRunnerVersion, getAnsibleVersion } from '../../core/system/ansible-versions';
 import { Role } from '../../data/database/model/User';
 import UserRepo from '../../data/database/repository/UserRepo';
 import { getIntConfFromCache } from '../../data/cache';
-import asyncHandler from '../../helpers/AsyncHandler';
-import logger from '../../logger';
+import asyncHandler from '../../middlewares/AsyncHandler';
+import { createADefaultLocalUserRepository } from '../../modules/playbooks-repository/default-repositories';
 import DashboardUseCase from '../../use-cases/DashboardUseCase';
 import DeviceUseCases from '../../use-cases/DeviceUseCases';
 import { dependencies, version } from '../../../package.json';
 
 export const getCurrentUser = asyncHandler(async (req, res) => {
-  logger.info(`[CONTROLLER] - GET - /currentUser ${req.user?.email}`);
   const { online, offline, totalCpu, totalMem, overview } =
     await DeviceUseCases.getDevicesOverview();
   const considerDeviceOffline = await getIntConfFromCache(
@@ -45,8 +45,6 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
     name: req.user?.name,
     avatar: req.user?.avatar,
     email: req.user?.email,
-    notifyCount: 12,
-    unreadCount: 11,
     access: req.user?.role,
     devices: {
       online: online,
@@ -87,19 +85,19 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
         deps: dependencies,
         processes: process.versions,
         ansibleVersion: await getAnsibleVersion(),
+        ansibleRunnerVersion: await getAnsibleRunnerVersion(),
       },
     },
-  }).send(res);
+  } as API.CurrentUser).send(res);
 });
 
 export const createFirstUser = asyncHandler(async (req, res) => {
-  logger.info('[CONTROLLER] - POST - /createFirstUser');
   const { email, password, name, avatar } = req.body;
   const hasUser = (await UserRepo.count()) > 0;
   if (hasUser) {
     throw new AuthFailureError('Your instance already has a user, you must first connect');
   }
-
+  // TODO: move to use cases
   await UserRepo.create({
     email: email,
     password: password,
@@ -107,11 +105,11 @@ export const createFirstUser = asyncHandler(async (req, res) => {
     role: Role.ADMIN,
     avatar: avatar || '/avatars/squirrel.svg',
   });
+  await createADefaultLocalUserRepository();
   new SuccessResponse('Create first user').send(res);
 });
 
 export const hasUser = asyncHandler(async (req, res) => {
-  logger.info('[CONTROLLER] - GET - /hasUsers');
   const hasUser = (await UserRepo.count()) > 0;
   new SuccessResponse('Has user', { hasUsers: hasUser }).send(res);
 });

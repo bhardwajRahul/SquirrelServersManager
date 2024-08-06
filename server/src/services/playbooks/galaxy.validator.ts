@@ -1,5 +1,5 @@
 import { body, query } from 'express-validator';
-import validator from '../../middlewares/validator';
+import validator from '../../middlewares/Validator';
 
 export const getAnsibleGalaxyCollectionsValidator = [
   query('offset')
@@ -25,7 +25,13 @@ export const getAnsibleGalaxyCollectionValidator = [
 ];
 
 export const postInstallAnsibleGalaxyCollectionValidator = [
-  body('name').notEmpty().isString(),
-  body('namespace').notEmpty().isString(),
+  body('name')
+    .notEmpty()
+    .isString()
+    .matches(/^[\w.\-/]+$/),
+  body('namespace')
+    .notEmpty()
+    .isString()
+    .matches(/^[\w.\-/]+$/),
   validator,
 ];

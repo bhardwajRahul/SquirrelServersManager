@@ -1,9 +1,9 @@
 import { SsmContainer } from 'ssm-shared-lib';
 import Container from '../data/database/model/Container';
 import ContainerRepo from '../data/database/repository/ContainerRepo';
-import { Kind } from '../integrations/docker/core/Component';
-import WatcherEngine from '../integrations/docker/core/WatcherEngine';
-import Docker from '../integrations/docker/watchers/providers/docker/Docker';
+import { Kind } from '../modules/docker/core/Component';
+import WatcherEngine from '../modules/docker/core/WatcherEngine';
+import Docker from '../modules/docker/watchers/providers/docker/Docker';
 
 async function updateCustomName(customName: string, container: Container): Promise<void> {
   container.customName = customName;
@@ -28,6 +28,8 @@ async function performAction(container: Container, action: SsmContainer.Actions)
       return await registeredComponent.stopContainer(container);
     case SsmContainer.Actions.START:
       return await registeredComponent.startContainer(container);
+    default:
+      throw new Error(`Unknown action type ${action}`);
   }
 }
 

@@ -1,11 +1,10 @@
 import { parse } from 'url';
 import axios from 'axios';
 import { API } from 'ssm-shared-lib';
-import { InternalError } from '../../core/api/ApiError';
-import { SuccessResponse } from '../../core/api/ApiResponse';
-import asyncHandler from '../../helpers/AsyncHandler';
-import Shell from '../../integrations/shell';
-import logger from '../../logger';
+import { InternalError } from '../../middlewares/api/ApiError';
+import { SuccessResponse } from '../../middlewares/api/ApiResponse';
+import asyncHandler from '../../middlewares/AsyncHandler';
+import Shell from '../../modules/shell';
 
 export const getAnsibleGalaxyCollections = asyncHandler(async (req, res) => {
   const realUrl = req.url;
@@ -17,8 +16,9 @@ export const getAnsibleGalaxyCollections = asyncHandler(async (req, res) => {
     content?: string;
     namespace?: string;
   };
+  const offset = ((current as number) - 1) * (pageSize as number);
   const response = await axios.get(
-    `https://galaxy.ansible.com/api/v3/plugin/ansible/search/collection-versions/?${params.namespace ? 'namespace=' + encodeURIComponent(params.namespace) + '&' : ''}${params.content ? 'keywords=' + encodeURIComponent(params.content) + '&' : ''}is_deprecated=false&repository_label=!hide_from_search&is_highest=true&offset=${current}&limit=${pageSize}&order_by=name`,
+    `https://galaxy.ansible.com/api/v3/plugin/ansible/search/collection-versions/?${params.namespace ? 'namespace=' + encodeURIComponent(params.namespace) + '&' : ''}${params.content ? 'keywords=' + encodeURIComponent(params.content) + '&' : ''}is_deprecated=false&repository_label=!hide_from_search&is_highest=true&offset=${offset}&limit=${pageSize}&order_by=name`,
   );
   new SuccessResponse('Get Ansible Galaxy Collections successful', response.data?.data || [], {
     total: response.data?.meta?.count,
@@ -50,7 +50,7 @@ export const getAnsibleGalaxyCollection = asyncHandler(async (req, res) => {
 export const postInstallAnsibleGalaxyCollection = asyncHandler(async (req, res) => {
   const { name, namespace } = req.body;
   try {
-    await Shell.AnsibleShell.installAnsibleGalaxyCollection(name, namespace);
+    await Shell.AnsibleShellCommandsManager.installAnsibleGalaxyCollection(name, namespace);
   } catch (error: any) {
     throw new InternalError(error.message);
   }
